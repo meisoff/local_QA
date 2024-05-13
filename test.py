@@ -108,4 +108,4 @@ def rag_chain(question, retriever):
 
 
 if __name__ == "__main__":
-    start()
+    print(str([{'sss':1212}]))

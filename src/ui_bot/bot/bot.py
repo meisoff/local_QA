@@ -11,6 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, FSInputFile
 
+from src.db.get_content import get_user_hash_file
 from src.db.save_content import save_file
 from src.model.rpc.execute import execute
 from src.ui_bot.bot.rpc.send import send_rabbit
@@ -22,11 +23,12 @@ PATH_TO_DATA = getenv('PATH_TO_DATA')
 
 class DocumentStates(StatesGroup):
     file_name = State()
+    chat_history = State()
 
 
 dp = Dispatcher()
 
-messages = []
+# messages = []
 
 
 def setup_handlers(bot):
@@ -43,10 +45,11 @@ def setup_handlers(bot):
             resize_keyboard=True
         )
         await message.answer(
-            "Send pdf to get answer.",
+            "Отправьте пдф-файл).",
             reply_markup=custom_keyboard)
-        await upload_file(message, state)
         await state.set_state(None)
+        await upload_file(message, state)
+
 
     @dp.message(F.document)
     async def upload_file(message: Message, state: FSMContext):
@@ -59,14 +62,14 @@ def setup_handlers(bot):
                     await message.answer(Strings.WAIT_MSG)
                     file_id = message.document.file_id
                     file_name = file_id + "." + file_extension
-                    data = await state.get_data()
-
-                    if 'file_name' in data:
-                        await state.update_data(file_name=file_name)
-
-                    else:
-                        await state.set_state(DocumentStates.file_name)
-                        await state.update_data(file_name=file_name)
+                    # data = await state.get_data()
+                    #
+                    # if 'file_name' in data:
+                    #     await state.update_data(file_name=file_name)
+                    #
+                    # else:
+                    #     await state.set_state(DocumentStates.file_name)
+                    #     await state.update_data(file_name=file_name)
 
                     file = await bot.get_file(file_id)
                     file_on_disk = f"{PATH_TO_DATA}/{file_name}"
@@ -97,32 +100,39 @@ def setup_handlers(bot):
     async def command_print_handler(message: Message, state: FSMContext) -> None:
         data = await state.get_data()
 
-        if 'file_name' in data:
+        if 'file_name' in data or get_user_hash_file(message.from_user.id):
             await message.answer(Strings.WAIT_MSG)
-            answer = await execute(message.text, message.from_user.id)
-            print(answer)
-            await message.answer(answer)
+            if 'chat_history' in data:
+                answer = await execute(message.text, message.from_user.id, data["chat_history"])
+                await state.update_data(chat_history=answer["chat_history"])
+            else:
+                await state.set_state(DocumentStates.chat_history)
+                answer = await execute(message.text, message.from_user.id, None)
+                await state.update_data(chat_history=answer["chat_history"])
+
+            print(answer["response"])
+            await message.answer(answer["response"])
 
         else:
             await message.answer("Пожалуйста, загрузите файл и повторите вопрос")
 
 
-    @dp.message(Command("print"))
-    async def command_print_handler(message: Message) -> None:
-        last_message = messages[-1]
-        await message.answer(f"Last message was printed: {last_message}")
-        await send_rabbit(f"print {last_message}")
-
-    @dp.message(Command("send"))
-    async def command_send_handler(message: Message) -> None:
-        last_message = messages[-1]
-        await message.answer(f"Last message was send: {last_message}")
-        await send_rabbit(f"send {last_message}")
-
-
-    @dp.message()
-    async def message_loger(message: types.Message) -> None:
-        messages.append(message.text)
+    # @dp.message(Command("print"))
+    # async def command_print_handler(message: Message) -> None:
+    #     last_message = messages[-1]
+    #     await message.answer(f"Last message was printed: {last_message}")
+    #     await send_rabbit(f"print {last_message}")
+    #
+    # @dp.message(Command("send"))
+    # async def command_send_handler(message: Message) -> None:
+    #     last_message = messages[-1]
+    #     await message.answer(f"Last message was send: {last_message}")
+    #     await send_rabbit(f"send {last_message}")
+    #
+    #
+    # @dp.message()
+    # async def message_loger(message: types.Message) -> None:
+    #     messages.append(message.text)
 
 
 
