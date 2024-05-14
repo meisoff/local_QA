@@ -7,10 +7,6 @@ The assistant should also indicate when the answer cannot be found in the contex
 CONTEXT_PROMPT_EN = """\
 Answer the following question using only the context below. Only include information specifically discussed.
 
-Chat History:
-
-{chat_history}
-
 Here are the relevant documents for the context:
 
 {context_str}

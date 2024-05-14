@@ -28,25 +28,20 @@ class DocumentStates(StatesGroup):
 
 dp = Dispatcher()
 
-# messages = []
-
 
 def setup_handlers(bot):
     @dp.message(CommandStart())
-    async def start(message: types.Message, bot: Bot, state: FSMContext):
-        # await set_commands(bot)
-        logo = FSInputFile('bot/static/start_pic.jpg')
-        await message.answer_photo(photo=logo,
-                                   caption=Strings.HELLO_MSG)
-        # Open main menu and set empty state
-        # await menu(message, state)
-        custom_keyboard = types.ReplyKeyboardMarkup(
-            keyboard=[[types.KeyboardButton(text="/file")]],
-            resize_keyboard=True
-        )
+    async def start(message: types.Message, state: FSMContext):
+        username = message.from_user.username
+        await message.answer(f"Привет @{username}!")
+
+        await state.set_state(None)
+        await upload_file(message, state)
+
+    @dp.message(Command("/reset"))
+    async def reset(message: types.Message, state: FSMContext):
         await message.answer(
-            "Отправьте пдф-файл).",
-            reply_markup=custom_keyboard)
+            "Чат обновлен. Отправьте пдф-файл",)
         await state.set_state(None)
         await upload_file(message, state)
 
@@ -59,17 +54,10 @@ def setup_handlers(bot):
 
             if file_extension in ["docx", "xlsx", "pdf"]:
                 try:
-                    await message.answer(Strings.WAIT_MSG)
+                    sent_message = await message.reply(Strings.WAIT_MSG)
+                    await bot.send_chat_action(message.chat.id, 'typing')
                     file_id = message.document.file_id
                     file_name = file_id + "." + file_extension
-                    # data = await state.get_data()
-                    #
-                    # if 'file_name' in data:
-                    #     await state.update_data(file_name=file_name)
-                    #
-                    # else:
-                    #     await state.set_state(DocumentStates.file_name)
-                    #     await state.update_data(file_name=file_name)
 
                     file = await bot.get_file(file_id)
                     file_on_disk = f"{PATH_TO_DATA}/{file_name}"
@@ -81,10 +69,12 @@ def setup_handlers(bot):
 
                         # Сохраняем данные в бд и удаляем из временного хранилища
                         await save_file(file_name, message.from_user.id)
-                        await message.answer(f"✅ {message.document.file_name} успешно загружен")
+                        await sent_message.delete()
+                        await message.reply(f"✅ {message.document.file_name} загружен. Ваши вопросы?")
 
                     except:
-                        await message.answer(f"❌ Ошибка при загрузке файла")
+                        await sent_message.delete()
+                        await message.reply(f"❌ Ошибка при загрузке файла")
 
 
                 except Exception as e:
@@ -93,7 +83,7 @@ def setup_handlers(bot):
             else:
                 await message.answer('⚙️ Можно загрузить только файлы расширения "docx", "xlsx", "pdf"')
         else:
-            await message.answer("Пожалуйста, загрузите файл")
+            await message.answer("Отправь файл, в котором нужно найти ответ")
 
 
     @dp.message(F.text)
@@ -101,21 +91,15 @@ def setup_handlers(bot):
         data = await state.get_data()
 
         if 'file_name' in data or get_user_hash_file(message.from_user.id):
-            await message.answer(Strings.WAIT_MSG)
-            if 'chat_history' in data:
-                answer = await execute(message.text, message.from_user.id, data["chat_history"])
-                await state.update_data(chat_history=answer["chat_history"])
-            else:
-                await state.set_state(DocumentStates.chat_history)
-                answer = await execute(message.text, message.from_user.id, None)
-                await state.update_data(chat_history=answer["chat_history"])
-
-            print(answer["response"])
-            await message.answer(answer["response"])
+            sent_message = await message.reply(Strings.WAIT_MSG)
+            await bot.send_chat_action(message.chat.id, 'typing')
+            answer = await execute(message.text, message.from_user.id)
+            await sent_message.delete()
+            print(answer)
+            await message.reply(answer)
 
         else:
             await message.answer("Пожалуйста, загрузите файл и повторите вопрос")
-
 
     # @dp.message(Command("print"))
     # async def command_print_handler(message: Message) -> None:
