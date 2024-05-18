@@ -14,6 +14,7 @@ def ollama_llm(question, context):
     messages = [{"role": "system", "content": SYSTEM_MESSAGE_PROMT}, message_template]
 
     response = ollama.chat(model='llama3', messages=messages)
+    r = ollama.AsyncClient
     messages.append(response['message'])
     print(messages)
     print(response)

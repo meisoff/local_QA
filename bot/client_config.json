@@ -1,0 +1,7 @@
+{
+    "kto": {
+        "base_url": "http://0.0.0.0:11434/v1",
+        "api_key": "...",
+        "model_name": "llama3"
+    }
+}
